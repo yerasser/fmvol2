@@ -48,18 +48,28 @@ export default function VinylRecord() {
         const t = window.getComputedStyle(el).transform;
         if (!t || t === "none") return 0;
 
-        const m = t.match(/matrix\(([^)]+)\)/);
-        if (!m) return 0;
+        // matrix(a,b,c,d,tx,ty)
+        let m = t.match(/matrix\(([^)]+)\)/);
+        if (m) {
+            const [a, b] = m[1].split(",").map((x) => parseFloat(x.trim()));
+            let deg = (Math.atan2(b, a) * 180) / Math.PI;
+            return (deg + 360) % 360;
+        }
 
-        const [a, b] = m[1].split(",").map((x) => parseFloat(x.trim()));
-        const rad = Math.atan2(b, a);
-        let deg = (rad * 180) / Math.PI;
-        deg = (deg + 360) % 360;
-        return deg;
+        // matrix3d(m11,m12,...,m44)
+        m = t.match(/matrix3d\(([^)]+)\)/);
+        if (m) {
+            const v = m[1].split(",").map((x) => parseFloat(x.trim()));
+            const a = v[0];  // m11
+            const b = v[1];  // m12
+            let deg = (Math.atan2(b, a) * 180) / Math.PI;
+            return (deg + 360) % 360;
+        }
+
+        return 0;
     };
 
     const idxUnderPointerLive = (discAngleDeg) => {
-        // для подсветки можно оставить EPS чтобы меньше мигало
         const pointerAngle = (360 - (discAngleDeg % 360) + 360) % 360;
         const shifted = (pointerAngle + 0.6) % 360;
         return Math.floor(shifted / slice);
@@ -252,7 +262,6 @@ export default function VinylRecord() {
                         <g clipPath="url(#discClip)">
                             <circle cx={cx} cy={cy} r={R} fill="url(#vinylBase)" />
 
-                            {/* подсветка текущего ближайшего сектора */}
                             <path d={describeRingSlice(cx, cy, R - 6, labelR + 14, segStart, segEnd)} fill="rgba(255,255,255,0.08)" />
                             <path
                                 d={describeRingSlice(cx, cy, R - 6, labelR + 14, segStart, segEnd)}
