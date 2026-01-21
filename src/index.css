@@ -1,0 +1,11 @@
+@import url('https://fonts.googleapis.com/css2?family=Arimo:ital,wght@0,400..700;1,400..700&family=Nunito+Sans:ital,opsz,wdth@0,6..12,125;1,6..12,125&display=swap');@import "tailwindcss";
+
+.expand {
+    font-variation-settings:
+            "wdth" 125,
+            "YTLC" 500;
+}
+
+body {
+    background: #f6f4f0;
+}
