@@ -1,19 +1,17 @@
-import Header from "./components/Header.jsx";
-import VinylRecord from "./components/VinylRecord.jsx";
-import Footer from "./components/Footer.jsx";
-import Background from "./components/Background.jsx";
-
+import {Route, Routes} from "react-router";
+import Svg from "./pages/Svg.jsx"
+import Canvas from "./pages/Canvas.jsx";
+import Logic1 from "./pages/Logic1.jsx";
+import Logic2 from "./pages/Logic2.jsx";
 
 export default function App() {
 
     return (
-        <div className="max-h-screen">
-            <Background />
-            <main className="flex flex-col items-center justify-between min-h-screen p-8">
-                <Header />
-                <VinylRecord />
-                <Footer />
-            </main>
-        </div>
+        <Routes>
+            <Route path='/svg' element={<Svg />} />
+            <Route path='/canvas' element={<Canvas />} />
+            <Route path='/logic1' element={<Logic1 />} />
+            <Route path='/logic2' element={<Logic2 />} />
+        </Routes>
     );
 }

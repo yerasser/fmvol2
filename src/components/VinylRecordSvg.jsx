@@ -1,6 +1,5 @@
 import React, { useMemo, useRef, useState, useEffect } from "react";
 
-// cubic-bezier(0.12, 0.9, 0.2, 1) evaluator (no deps)
 function makeCubicBezier(p1x, p1y, p2x, p2y) {
     const cx = 3 * p1x;
     const bx = 3 * (p2x - p1x) - cx;
@@ -32,7 +31,7 @@ function makeCubicBezier(p1x, p1y, p2x, p2y) {
 
 const ease = makeCubicBezier(0.12, 0.9, 0.2, 1);
 
-export default function VinylRecord() {
+export default function VinylRecordSvg() {
     const items = useMemo(
         () => ["Popping", "Boogaloo", "Lines", "Animation", "Waving", "Concepts", "Bay area", "Footwork/ground"],
         []
@@ -48,13 +47,11 @@ export default function VinylRecord() {
     const rafRef = useRef(null);
     const rotationRef = useRef(0);
 
-    // highlight segment by index (instead of reading transform from DOM)
     const [liveIdx, setLiveIdx] = useState(0);
     const liveIdxRef = useRef(0);
 
     const [durationMs, setDurationMs] = useState(4400);
 
-    // animation refs for predictive angle
     const animStartTimeRef = useRef(0);
     const animFromRef = useRef(0);
     const animToRef = useRef(0);
@@ -143,7 +140,6 @@ export default function VinylRecord() {
         rotationRef.current = to;
         setRotation(to);
 
-        // start predictive tracking
         animStartTimeRef.current = performance.now();
         animFromRef.current = from;
         animToRef.current = to;
@@ -194,7 +190,7 @@ export default function VinylRecord() {
     const segEnd = segStart + slice;
 
     return (
-        <div className="flex justify-center w-full px-10">
+        <div className="flex justify-center w-full px-36">
             <div className="relative w-full aspect-square">
                 <div
                     style={{
@@ -284,7 +280,6 @@ export default function VinylRecord() {
                         <g clipPath="url(#discClip)">
                             <circle cx={cx} cy={cy} r={R} fill="url(#vinylBase)" />
 
-                            {/* live highlighted segment */}
                             <path
                                 d={describeRingSlice(cx, cy, R - 6, labelR + 14, segStart, segEnd)}
                                 fill="rgba(255,255,255,0.08)"
