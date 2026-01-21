@@ -490,7 +490,7 @@ export default function VinylRecordLogic2() {
     };
 
     return (
-        <div className="flex justify-center w-full px-36">
+        <div className="flex justify-center w-full px-3">
             <div className="relative w-full aspect-square">
                 <canvas
                     ref={canvasRef}
