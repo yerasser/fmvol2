@@ -1,5 +1,37 @@
 import React, { useMemo, useRef, useState, useEffect } from "react";
 
+// cubic-bezier(0.12, 0.9, 0.2, 1) evaluator (no deps)
+function makeCubicBezier(p1x, p1y, p2x, p2y) {
+    const cx = 3 * p1x;
+    const bx = 3 * (p2x - p1x) - cx;
+    const ax = 1 - cx - bx;
+
+    const cy = 3 * p1y;
+    const by = 3 * (p2y - p1y) - cy;
+    const ay = 1 - cy - by;
+
+    const sampleX = (t) => ((ax * t + bx) * t + cx) * t;
+    const sampleY = (t) => ((ay * t + by) * t + cy) * t;
+    const sampleDX = (t) => (3 * ax * t + 2 * bx) * t + cx;
+
+    const solveT = (x) => {
+        let t = x;
+        for (let i = 0; i < 7; i++) {
+            const x2 = sampleX(t) - x;
+            const d = sampleDX(t);
+            if (Math.abs(d) < 1e-7) break;
+            t -= x2 / d;
+        }
+        if (t < 0) t = 0;
+        if (t > 1) t = 1;
+        return t;
+    };
+
+    return (x) => sampleY(solveT(x));
+}
+
+const ease = makeCubicBezier(0.12, 0.9, 0.2, 1);
+
 export default function VinylRecord() {
     const items = useMemo(
         () => ["Popping", "Boogaloo", "Lines", "Animation", "Waving", "Concepts", "Bay area", "Footwork/ground"],
@@ -14,19 +46,25 @@ export default function VinylRecord() {
 
     const gRef = useRef(null);
     const rafRef = useRef(null);
-    const lastTargetRef = useRef(0);
     const rotationRef = useRef(0);
 
+    // highlight segment by index (instead of reading transform from DOM)
+    const [liveIdx, setLiveIdx] = useState(0);
+    const liveIdxRef = useRef(0);
 
-    const [liveAngle, setLiveAngle] = useState(0);
     const [durationMs, setDurationMs] = useState(4400);
+
+    // animation refs for predictive angle
+    const animStartTimeRef = useRef(0);
+    const animFromRef = useRef(0);
+    const animToRef = useRef(0);
+    const animDurRef = useRef(0);
 
     const cx = 160;
     const cy = 160;
     const R = 150;
     const labelR = 38;
     const holeR = 6;
-
 
     const polarToCartesian = (centerX, centerY, radius, angleDeg) => {
         const a = ((angleDeg - 90) * Math.PI) / 180;
@@ -44,47 +82,31 @@ export default function VinylRecord() {
         return rings;
     }, []);
 
-    const getAngleFromMatrix = (el) => {
-        const t = window.getComputedStyle(el).transform;
-        if (!t || t === "none") return 0;
-
-        // matrix(a,b,c,d,tx,ty)
-        let m = t.match(/matrix\(([^)]+)\)/);
-        if (m) {
-            const [a, b] = m[1].split(",").map((x) => parseFloat(x.trim()));
-            let deg = (Math.atan2(b, a) * 180) / Math.PI;
-            return (deg + 360) % 360;
-        }
-
-        // matrix3d(m11,m12,...,m44)
-        m = t.match(/matrix3d\(([^)]+)\)/);
-        if (m) {
-            const v = m[1].split(",").map((x) => parseFloat(x.trim()));
-            const a = v[0];  // m11
-            const b = v[1];  // m12
-            let deg = (Math.atan2(b, a) * 180) / Math.PI;
-            return (deg + 360) % 360;
-        }
-
-        return 0;
-    };
-
-    const idxUnderPointerLive = (discAngleDeg) => {
+    const idxUnderPointer = (discAngleDeg) => {
         const pointerAngle = (360 - (discAngleDeg % 360) + 360) % 360;
         const shifted = (pointerAngle + 0.6) % 360;
         return Math.floor(shifted / slice);
     };
 
-
     const startTracking = () => {
         if (rafRef.current) return;
 
         const tick = () => {
-            if (gRef.current) {
-                const deg = getAngleFromMatrix(gRef.current);
-                setLiveAngle(deg);
+            const now = performance.now();
+            const dur = animDurRef.current || 1;
+            const t = Math.min(1, Math.max(0, (now - animStartTimeRef.current) / dur));
+            const k = ease(t);
+
+            const ang = animFromRef.current + (animToRef.current - animFromRef.current) * k;
+            const idx = idxUnderPointer(ang);
+
+            if (idx !== liveIdxRef.current) {
+                liveIdxRef.current = idx;
+                setLiveIdx(idx);
             }
-            rafRef.current = requestAnimationFrame(tick);
+
+            if (t < 1) rafRef.current = requestAnimationFrame(tick);
+            else rafRef.current = null;
         };
 
         rafRef.current = requestAnimationFrame(tick);
@@ -101,7 +123,8 @@ export default function VinylRecord() {
         if (spinning) return;
         setSpinning(true);
 
-        setDurationMs(3600 + Math.random() * 2200);
+        const dur = 3600 + Math.random() * 2200;
+        setDurationMs(dur);
 
         const winnerIndex = Math.floor(Math.random() * N);
 
@@ -114,26 +137,26 @@ export default function VinylRecord() {
 
         const target = 360 * extraTurns - pointerTarget + jitter;
 
-        const base = rotationRef.current;
-        const newRotation = base + target + 720;
+        const from = rotationRef.current;
+        const to = from + target + 720;
 
-        rotationRef.current = newRotation;
-        lastTargetRef.current = newRotation; // можно оставить, но финал не по нему
-        setRotation(newRotation);
+        rotationRef.current = to;
+        setRotation(to);
+
+        // start predictive tracking
+        animStartTimeRef.current = performance.now();
+        animFromRef.current = from;
+        animToRef.current = to;
+        animDurRef.current = dur;
 
         startTracking();
     };
 
-
-
     const onTransitionEnd = (e) => {
         if (e.target !== gRef.current) return;
-
         stopTracking();
-
         setSpinning(false);
     };
-
 
     const prizeTextPos = (i) => {
         const mid = i * slice + slice / 2;
@@ -167,7 +190,6 @@ export default function VinylRecord() {
         ].join(" ");
     };
 
-    const liveIdx = idxUnderPointerLive(liveAngle);
     const segStart = liveIdx * slice;
     const segEnd = segStart + slice;
 
@@ -196,6 +218,7 @@ export default function VinylRecord() {
                     viewBox="0 0 320 320"
                     preserveAspectRatio="xMidYMid meet"
                     onClick={spin}
+                    style={{ touchAction: "manipulation" }}
                 >
                     <defs>
                         <radialGradient id="vinylBase" cx="40%" cy="35%" r="75%">
@@ -252,9 +275,8 @@ export default function VinylRecord() {
                         style={{
                             transformOrigin: `${cx}px ${cy}px`,
                             transform: `rotate(${rotation}deg)`,
-                            transition: spinning
-                                ? `transform ${durationMs}ms cubic-bezier(0.12, 0.9, 0.2, 1)`
-                                : "none",
+                            transition: spinning ? `transform ${durationMs}ms cubic-bezier(0.12, 0.9, 0.2, 1)` : "none",
+                            willChange: "transform",
                         }}
                     >
                         <circle cx={cx} cy={cy} r={R} fill="transparent" filter="url(#discShadow)" />
@@ -262,7 +284,11 @@ export default function VinylRecord() {
                         <g clipPath="url(#discClip)">
                             <circle cx={cx} cy={cy} r={R} fill="url(#vinylBase)" />
 
-                            <path d={describeRingSlice(cx, cy, R - 6, labelR + 14, segStart, segEnd)} fill="rgba(255,255,255,0.08)" />
+                            {/* live highlighted segment */}
+                            <path
+                                d={describeRingSlice(cx, cy, R - 6, labelR + 14, segStart, segEnd)}
+                                fill="rgba(255,255,255,0.08)"
+                            />
                             <path
                                 d={describeRingSlice(cx, cy, R - 6, labelR + 14, segStart, segEnd)}
                                 fill="none"
@@ -283,7 +309,15 @@ export default function VinylRecord() {
                             ))}
 
                             {grooveRings.map((gr) => (
-                                <circle key={`d${gr.r}`} cx={cx} cy={cy} r={gr.r + 0.7} fill="none" stroke="rgba(0,0,0,0.10)" strokeWidth="1" />
+                                <circle
+                                    key={`d${gr.r}`}
+                                    cx={cx}
+                                    cy={cy}
+                                    r={gr.r + 0.7}
+                                    fill="none"
+                                    stroke="rgba(0,0,0,0.10)"
+                                    strokeWidth="1"
+                                />
                             ))}
 
                             <rect x="0" y="0" width="320" height="320" filter="url(#dust)" opacity="0.22" />
