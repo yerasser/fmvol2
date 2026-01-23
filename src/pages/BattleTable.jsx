@@ -209,7 +209,7 @@ export default function BattleBracketPairsAndTriple() {
                     <div className="rounded-2xl border border-black/15 bg-[#f7f4ee] p-5 shadow-[0_6px_30px_-20px_rgba(0,0,0,0.35)]">
                         <div className="mt-3 grid gap-3 md:grid-cols-2">
               <textarea
-                  className="h-40 w-full resize-none rounded-xl border border-black/15 bg-white/55 p-3 text-sm outline-none focus:border-black/30"
+                  className="h-auto w-full resize-none rounded-xl border border-black/15 bg-white/55 p-3 text-sm outline-none focus:border-black/30"
                   value={namesText}
                   onChange={(e) => setNamesText(e.target.value)}
                   placeholder="Имена, по одному на строку"
