@@ -156,10 +156,8 @@ export default function BattleBracketPairsAndTriple() {
     function deleteParticipant(name) {
         if (!name) return;
 
-        // 1) обновляем players
         setPlayers((prev) => prev.filter((p) => p !== name));
 
-        // 2) чистим winnersMap (если где-то выбран этот участник)
         setWinnersMap((prev) => {
             const next = { ...prev };
             Object.keys(next).forEach((k) => {
@@ -168,7 +166,6 @@ export default function BattleBracketPairsAndTriple() {
             return next;
         });
 
-        // 3) (опционально) синхронизируем textarea, чтобы UI не расходился
         setNamesText((prev) => {
             const list = parseNames(prev).filter((p) => p !== name);
             return list.join("\n");
@@ -195,7 +192,7 @@ export default function BattleBracketPairsAndTriple() {
             const cleaned = names.map((x) => String(x).trim()).filter(Boolean);
             const randomized = shuffle(cleaned);
 
-            setNamesText(randomized.join("\n"));
+            setNamesText(cleaned.join("\n"));
             setPlayers(randomized);
             setWinnersMap({});
         } catch (e) {
