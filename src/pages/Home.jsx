@@ -9,10 +9,7 @@ const linkBase =
 export default function Home() {
     return (
         <div className="w-screen h-screen flex flex-col justify-center items-center">
-            <NavLink to="/svg" className={linkBase}>SVG</NavLink>
-            <NavLink to="/canvas" className={linkBase}>Canvas</NavLink>
-            <NavLink to="/logic1" className={linkBase}>Блок на 3 прокрута</NavLink>
-            <NavLink to="/logic2" className={linkBase}>Убираем по 1</NavLink>
+            <NavLink to="/fortune" className={linkBase}>Колесо фортуны</NavLink>
             <NavLink to="/battle" className={linkBase}>Сетка</NavLink>
         </div>
     );

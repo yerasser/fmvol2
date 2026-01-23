@@ -6,13 +6,12 @@ function easeOutCubic(t) {
     return 1 - Math.pow(1 - t, 3);
 }
 
-// deterministic-ish noise (no libraries)
 function hash2(x, y) {
     const s = Math.sin(x * 127.1 + y * 311.7) * 43758.5453123;
     return s - Math.floor(s);
 }
 
-export default function VinylRecordLogic2() {
+export default function VinylRecord() {
     const items = useMemo(
         () => ["Popping", "Boogaloo", "Lines", "Animation", "Waving", "Concepts", "Bay area", "Footwork\nGround"],
         []
@@ -31,41 +30,10 @@ export default function VinylRecordLogic2() {
     const animRef = useRef({ start: 0, dur: 0, from: 0, to: 0, active: false });
     const sizeRef = useRef({ w: 0, h: 0, dpr: 1 });
 
-    // prebuilt dust pattern cache
     const dustRef = useRef(null); // { canvas, w, h, dpr }
 
-    // ===== NEW LOGIC: "bag" without repeats until all used =====
-    // bagRef holds remaining indices that can still выпадать in current cycle
-    const bagRef = useRef([]); // e.g. [0..N-1] shuffled, we pick & remove
-    const lastPlannedIdxRef = useRef(null);
-
-    const initBag = () => {
-        const arr = Array.from({ length: N }, (_, i) => i);
-        // shuffle
-        for (let i = arr.length - 1; i > 0; i--) {
-            const j = Math.floor(Math.random() * (i + 1));
-            [arr[i], arr[j]] = [arr[j], arr[i]];
-        }
-        bagRef.current = arr;
-    };
-
-    const pickFromBag = () => {
-        if (bagRef.current.length === 0) initBag();
-
-        // если остался 1 — после выпадения сбрасываем и возвращаем все 8
-        if (bagRef.current.length === 1) {
-            const idx = bagRef.current[0];
-            bagRef.current = []; // очищаем, следующий спин -> initBag()
-            return idx;
-        }
-
-        // обычный случай: берем рандом из текущего мешка и удаляем
-        const k = Math.floor(Math.random() * bagRef.current.length);
-        const idx = bagRef.current[k];
-        bagRef.current.splice(k, 1);
-        return idx;
-    };
-    // ================================================
+    const lastWinnersRef = useRef([]); // latest first, max 3
+    const lastWinnerPlannedRef = useRef(null);
 
     const idxUnderPointer = (discAngleRad) => {
         const a = ((-discAngleRad % (Math.PI * 2)) + Math.PI * 2) % (Math.PI * 2);
@@ -116,11 +84,11 @@ export default function VinylRecordLogic2() {
                 const n = hash2(x, y);
                 const speck = n > 0.995 ? 1 : 0;
                 const grain = (n - 0.5) * 0.06;
-                const v = clamp(0.0 + grain + speck * 0.55, 0, 0.8);
+                const v = clamp(grain + speck * 0.55, 0, 0.8);
                 const a = clamp(v * 255, 0, 255);
 
                 const i = (y * wantW + x) * 4;
-                data[i + 0] = 255;
+                data[i] = 255;
                 data[i + 1] = 255;
                 data[i + 2] = 255;
                 data[i + 3] = a;
@@ -146,7 +114,6 @@ export default function VinylRecordLogic2() {
         const labelR = R * 0.25;
         const holeR = R * 0.04;
 
-        // shadow
         ctx.save();
         ctx.translate(cx, cy);
         ctx.shadowColor = "rgba(0,0,0,0.45)";
@@ -162,7 +129,6 @@ export default function VinylRecordLogic2() {
         ctx.translate(cx, cy);
         ctx.rotate(angleRad);
 
-        // vinyl base
         const base = ctx.createRadialGradient(-R * 0.1, -R * 0.15, R * 0.1, 0, 0, R * 0.75);
         base.addColorStop(0.0, "#2a2f3a");
         base.addColorStop(0.45, "#121723");
@@ -174,7 +140,6 @@ export default function VinylRecordLogic2() {
         ctx.fillStyle = base;
         ctx.fill();
 
-        // active segment wedge
         const idx = idxUnderPointer(angleRad);
         const start = idx * slice - Math.PI / 2;
         const end = start + slice;
@@ -191,7 +156,6 @@ export default function VinylRecordLogic2() {
         ctx.lineWidth = 1;
         ctx.stroke();
 
-        // grooves
         ctx.save();
         ctx.globalAlpha = 1;
 
@@ -219,7 +183,6 @@ export default function VinylRecordLogic2() {
         }
         ctx.restore();
 
-        // dust overlay
         ctx.save();
         ctx.rotate(-angleRad);
         const pxSize = Math.min(W, H);
@@ -231,7 +194,6 @@ export default function VinylRecordLogic2() {
         }
         ctx.restore();
 
-        // diagonal highlight
         ctx.save();
         const g = ctx.createLinearGradient(-R * 0.64, -R * 0.55, R * 0.64, -R * 0.12);
         g.addColorStop(0.0, "rgba(255,255,255,0)");
@@ -245,7 +207,6 @@ export default function VinylRecordLogic2() {
         ctx.fill();
         ctx.restore();
 
-        // edge spec
         ctx.save();
         const edge = ctx.createRadialGradient(R * 0.05, -R * 0.05, R * 0.1, 0, 0, R * 0.7);
         edge.addColorStop(0.60, "rgba(255,255,255,0)");
@@ -257,14 +218,12 @@ export default function VinylRecordLogic2() {
         ctx.fill();
         ctx.restore();
 
-        // outer stroke
         ctx.beginPath();
         ctx.arc(0, 0, R, 0, Math.PI * 2);
         ctx.strokeStyle = "rgba(0,0,0,0.55)";
         ctx.lineWidth = 4;
         ctx.stroke();
 
-        // label
         const label = ctx.createRadialGradient(-labelR * 0.2, -labelR * 0.3, labelR * 0.2, 0, 0, labelR);
         label.addColorStop(0, "#f2f0ea");
         label.addColorStop(0.65, "#d8d2c6");
@@ -284,7 +243,6 @@ export default function VinylRecordLogic2() {
         ctx.lineWidth = 1;
         ctx.stroke();
 
-        // texts
         ctx.save();
         const fontSize = Math.max(10, R * 0.07);
         ctx.font = `${fontSize}px Arimo`;
@@ -318,7 +276,6 @@ export default function VinylRecordLogic2() {
         }
         ctx.restore();
 
-        // hole
         ctx.beginPath();
         ctx.arc(0, 0, holeR, 0, Math.PI * 2);
         ctx.fillStyle = "rgba(20,20,20,0.9)";
@@ -330,11 +287,10 @@ export default function VinylRecordLogic2() {
         ctx.lineWidth = 1;
         ctx.stroke();
 
-        ctx.restore(); // end disc rotation group
+        ctx.restore();
 
-        // pointer
         ctx.save();
-        ctx.translate(W / 2, H / 2);
+        ctx.translate(cx, cy);
         const pW = R * 0.1;
         const pH = R * 0.12;
         const inset = R * 0.06;
@@ -383,15 +339,6 @@ export default function VinylRecordLogic2() {
             a.active = false;
             setSpinning(false);
 
-            const finalIdx = idxUnderPointer(rotationRef.current);
-            console.log("[spin result]", {
-                plannedIdx: lastPlannedIdxRef.current,
-                plannedName: items[lastPlannedIdxRef.current],
-                finalIdx,
-                finalName: items[finalIdx],
-                bagRemainingAfterPick: bagRef.current.slice(),
-            });
-
             rafRef.current = requestAnimationFrame(tick);
         }
     };
@@ -418,9 +365,6 @@ export default function VinylRecordLogic2() {
     };
 
     useEffect(() => {
-        // initialize bag on mount
-        initBag();
-
         resize();
         rafRef.current = requestAnimationFrame(tick);
         window.addEventListener("resize", resize);
@@ -428,7 +372,6 @@ export default function VinylRecordLogic2() {
             window.removeEventListener("resize", resize);
             stop();
         };
-        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
 
     const spin = () => {
@@ -441,12 +384,25 @@ export default function VinylRecordLogic2() {
 
         const dur = 3600 + Math.random() * 2200;
 
-        // ===== NEW: pick and remove from bag =====
-        const winnerIndex = pickFromBag();
-        lastPlannedIdxRef.current = winnerIndex;
-        // ========================================
+        const blockedArr = lastWinnersRef.current.slice(0, 3);
+        const blockedSet = new Set(blockedArr);
 
-        // ===== land EXACTLY in winnerIndex sector =====
+        let winnerIndex;
+        let attempts = 0;
+
+        if (N <= 3) {
+            winnerIndex = Math.floor(Math.random() * N);
+        } else {
+            do {
+                winnerIndex = Math.floor(Math.random() * N);
+                attempts += 1;
+                if (attempts > 200) break;
+            } while (blockedSet.has(winnerIndex));
+        }
+
+        lastWinnersRef.current = [winnerIndex, ...lastWinnersRef.current].slice(0, 3);
+        lastWinnerPlannedRef.current = winnerIndex;
+
         const twoPi = Math.PI * 2;
 
         const margin = slice * 0.18;
@@ -459,26 +415,12 @@ export default function VinylRecordLogic2() {
         const from = rotationRef.current;
         const fromMod = ((from % twoPi) + twoPi) % twoPi;
 
-        const deltaMod = (desiredMod - fromMod + twoPi) % twoPi;
+        let deltaMod = (desiredMod - fromMod + twoPi) % twoPi;
 
         const extraTurns = 6 + Math.floor(Math.random() * 5);
         const target = twoPi * extraTurns + deltaMod;
 
         const to = from + target;
-
-        console.log("[spin planned]", {
-            winnerIndex,
-            winnerName: items[winnerIndex],
-            bagRemaining: bagRef.current.slice(),
-            from,
-            fromMod,
-            desiredMod,
-            deltaMod,
-            extraTurns,
-            to,
-            finalIdxCheck: idxUnderPointer(to),
-            finalNameCheck: items[idxUnderPointer(to)],
-        });
 
         animRef.current = {
             start: performance.now(),
@@ -488,6 +430,7 @@ export default function VinylRecordLogic2() {
             active: true,
         };
     };
+
 
     return (
         <div className="flex justify-center w-full px-3">

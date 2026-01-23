@@ -1,16 +1,17 @@
 import Header from "../components/Header.jsx";
-import VinylRecordSvg from "../components/VinylRecordSvg.jsx";
+import VinylRecordCanvas from "../components/VinylRecordCanvas.jsx";
 import Background from "../components/Background.jsx";
+import VinylRecord from "../components/VinylRecord.jsx";
 
 
-export default function Svg() {
+export default function Fortune() {
 
     return (
         <div className="max-h-screen overflow-hidden">
             <Background />
             <main className="flex flex-col items-center min-h-screen p-8">
                 <Header />
-                <VinylRecordSvg />
+                <VinylRecord />
             </main>
         </div>
     );

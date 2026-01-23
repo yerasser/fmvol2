@@ -9,6 +9,15 @@ function parseNames(text) {
         .filter(Boolean);
 }
 
+function shuffle(arr) {
+    const a = [...arr];
+    for (let i = a.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [a[i], a[j]] = [a[j], a[i]];
+    }
+    return a;
+}
+
 function buildRounds(players, winnersMap) {
     const rounds = [];
     let current = [...players];
@@ -66,9 +75,9 @@ function buildRounds(players, winnersMap) {
     return { rounds, champion: current[0] ?? null };
 }
 
-function PlayerBtn({ name, active, disabled, onClick }) {
+function PlayerBtn({ name, active, disabled, onClick, onDelete }) {
     const base =
-        "w-full text-left px-3 py-2 rounded-lg border text-sm transition select-none";
+        "w-full px-3 py-2 rounded-lg border text-sm transition select-none flex items-center justify-between gap-3";
 
     const cls = disabled
         ? `${base} border-black/10 bg-black/[0.03] text-black/35 cursor-not-allowed`
@@ -77,9 +86,33 @@ function PlayerBtn({ name, active, disabled, onClick }) {
             : `${base} border-black/20 bg-white/50 text-black/80 hover:bg-white/70 hover:border-black/35`;
 
     return (
-        <button type="button" className={cls} disabled={disabled} onClick={onClick}>
-            {name}
-        </button>
+        <div className={cls}>
+            <button
+                type="button"
+                className="flex-1 text-left"
+                disabled={disabled}
+                onClick={onClick}
+                title={name}
+            >
+                {name}
+            </button>
+
+            {onDelete ? (
+                <button
+                    type="button"
+                    onClick={onDelete}
+                    className={
+                        disabled
+                            ? "pointer-events-none opacity-40"
+                            : "rounded-md px-2 py-1 text-xs border border-black/20 bg-white/60 hover:bg-white"
+                    }
+                    aria-label={`Удалить ${name}`}
+                    title="Удалить"
+                >
+                    ✕
+                </button>
+            ) : null}
+        </div>
     );
 }
 
@@ -87,14 +120,17 @@ export default function BattleBracketPairsAndTriple() {
     const [namesText, setNamesText] = useState("");
     const [players, setPlayers] = useState(() => parseNames(namesText));
     const [winnersMap, setWinnersMap] = useState({});
+    const [loadingPreset, setLoadingPreset] = useState(null); // "beginners" | "open" | null
+    const [error, setError] = useState("");
 
-    const { rounds} = useMemo(
+    const { rounds } = useMemo(
         () => buildRounds(players, winnersMap),
         [players, winnersMap]
     );
 
     function regenerate() {
-        setPlayers(parseNames(namesText));
+        const parsed = parseNames(namesText);
+        setPlayers(shuffle(parsed));
         setWinnersMap({});
     }
 
@@ -117,6 +153,58 @@ export default function BattleBracketPairsAndTriple() {
         });
     }
 
+    function deleteParticipant(name) {
+        if (!name) return;
+
+        // 1) обновляем players
+        setPlayers((prev) => prev.filter((p) => p !== name));
+
+        // 2) чистим winnersMap (если где-то выбран этот участник)
+        setWinnersMap((prev) => {
+            const next = { ...prev };
+            Object.keys(next).forEach((k) => {
+                if (next[k] === name) delete next[k];
+            });
+            return next;
+        });
+
+        // 3) (опционально) синхронизируем textarea, чтобы UI не расходился
+        setNamesText((prev) => {
+            const list = parseNames(prev).filter((p) => p !== name);
+            return list.join("\n");
+        });
+    }
+
+    async function loadPreset(type) {
+        const url = type === "beginners" ? "https://script.google.com/macros/s/AKfycbyX2E8Hs_UA4NAqCggpRQgzrBfbZH0YAxtedo8Cr8dmqRpDz8ZMkdsnDud0Z-mAfwuE/exec?nomination=beginners" : "https://script.google.com/macros/s/AKfycbyX2E8Hs_UA4NAqCggpRQgzrBfbZH0YAxtedo8Cr8dmqRpDz8ZMkdsnDud0Z-mAfwuE/exec?nomination=open";
+
+        setError("");
+        setLoadingPreset(type);
+
+        try {
+            const res = await fetch(url, { method: "GET" });
+            if (!res.ok) throw new Error(`HTTP ${res.status}`);
+
+            const data = await res.json();
+            const names = Array.isArray(data) ? data : data?.participants;
+
+            if (!Array.isArray(names)) {
+                throw new Error("Bad response format: expected array or { names: [] }");
+            }
+
+            const cleaned = names.map((x) => String(x).trim()).filter(Boolean);
+            const randomized = shuffle(cleaned);
+
+            setNamesText(randomized.join("\n"));
+            setPlayers(randomized);
+            setWinnersMap({});
+        } catch (e) {
+            setError(e?.message || "Fetch error");
+        } finally {
+            setLoadingPreset(null);
+        }
+    }
+
     return (
         <div className="min-h-screen bg-[#f5f2ec] text-black">
             <div className="mx-auto max-w-6xl px-4 py-8">
@@ -131,12 +219,32 @@ export default function BattleBracketPairsAndTriple() {
               />
 
                             <div className="flex flex-col gap-3">
+                                <div className="grid grid-cols-2 gap-3">
+                                    <button
+                                        type="button"
+                                        onClick={() => loadPreset("beginners")}
+                                        disabled={!!loadingPreset}
+                                        className="rounded-xl bg-transparent px-4 py-3 text-sm font-medium border border-black/25 text-black/80 hover:bg-white/50 disabled:opacity-50 disabled:cursor-not-allowed"
+                                    >
+                                        {loadingPreset === "beginners" ? "Loading..." : "Beginners"}
+                                    </button>
+
+                                    <button
+                                        type="button"
+                                        onClick={() => loadPreset("open")}
+                                        disabled={!!loadingPreset}
+                                        className="rounded-xl bg-transparent px-4 py-3 text-sm font-medium border border-black/25 text-black/80 hover:bg-white/50 disabled:opacity-50 disabled:cursor-not-allowed"
+                                    >
+                                        {loadingPreset === "open" ? "Loading..." : "Open styles"}
+                                    </button>
+                                </div>
+
                                 <button
                                     type="button"
                                     onClick={regenerate}
                                     className="rounded-xl bg-black px-4 py-3 text-sm font-medium text-[#f5f2ec] hover:bg-black/90 border border-black/70"
                                 >
-                                    Сгенерировать
+                                    Сгенерировать (рандом)
                                 </button>
 
                                 <button
@@ -146,6 +254,34 @@ export default function BattleBracketPairsAndTriple() {
                                 >
                                     Сбросить результаты
                                 </button>
+
+                                {error ? (
+                                    <div className="text-xs text-red-600 border border-red-600/20 bg-red-500/5 rounded-xl px-3 py-2">
+                                        {error}
+                                    </div>
+                                ) : null}
+
+                                {/* маленький список участников для удаления (до генерации/после) */}
+                                {players.length ? (
+                                    <div className="rounded-xl border border-black/10 bg-white/40 p-3">
+                                        <div className="text-xs font-semibold text-black/70 mb-2">
+                                            Участники (удаление)
+                                        </div>
+                                        <div className="flex flex-wrap gap-2">
+                                            {players.map((p) => (
+                                                <button
+                                                    key={p}
+                                                    type="button"
+                                                    onClick={() => deleteParticipant(p)}
+                                                    className="rounded-lg border border-black/15 bg-white/70 px-2 py-1 text-xs hover:bg-white"
+                                                    title="Удалить"
+                                                >
+                                                    {p} <span className="text-black/50">✕</span>
+                                                </button>
+                                            ))}
+                                        </div>
+                                    </div>
+                                ) : null}
                             </div>
                         </div>
                     </div>
@@ -184,6 +320,11 @@ export default function BattleBracketPairsAndTriple() {
                                                                         if (!allReady) return;
                                                                         pickWinner(rIndex, mIndex, p);
                                                                     }}
+                                                                    onDelete={
+                                                                        p
+                                                                            ? () => deleteParticipant(p)
+                                                                            : undefined
+                                                                    }
                                                                 />
                                                             ))}
                                                         </div>
@@ -191,9 +332,7 @@ export default function BattleBracketPairsAndTriple() {
                                                         <div className="mt-3 text-xs">
                                                             <span className="text-black/55">Победитель: </span>
                                                             {m.winner ? (
-                                                                <span className="text-black font-medium">
-                                  {m.winner}
-                                </span>
+                                                                <span className="text-black font-medium">{m.winner}</span>
                                                             ) : (
                                                                 <span className="text-black/35">—</span>
                                                             )}
@@ -207,7 +346,6 @@ export default function BattleBracketPairsAndTriple() {
                             </div>
                         </div>
                     </div>
-
                 </div>
             </div>
         </div>
