@@ -1,6 +1,7 @@
-import React, { useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 
 const keyOf = (roundIndex, matchIndex) => `${roundIndex}:${matchIndex}`;
+const STORAGE_KEY = "battle_bracket_last_v1";
 
 function parseNames(text) {
     return text
@@ -16,6 +17,14 @@ function shuffle(arr) {
         [a[i], a[j]] = [a[j], a[i]];
     }
     return a;
+}
+
+function safeParse(json) {
+    try {
+        return JSON.parse(json);
+    } catch {
+        return null;
+    }
 }
 
 function buildRounds(players, winnersMap) {
@@ -117,16 +126,35 @@ function PlayerBtn({ name, active, disabled, onClick, onDelete }) {
 }
 
 export default function BattleBracketPairsAndTriple() {
-    const [namesText, setNamesText] = useState("");
-    const [players, setPlayers] = useState(() => parseNames(namesText));
-    const [winnersMap, setWinnersMap] = useState({});
+    const saved =
+        typeof window !== "undefined"
+            ? safeParse(localStorage.getItem(STORAGE_KEY))
+            : null;
+
+    const [namesText, setNamesText] = useState(() => saved?.namesText ?? "");
+    const [players, setPlayers] = useState(() =>
+        Array.isArray(saved?.players) ? saved.players : parseNames(saved?.namesText ?? "")
+    );
+    const [winnersMap, setWinnersMap] = useState(() =>
+        saved?.winnersMap && typeof saved.winnersMap === "object" ? saved.winnersMap : {}
+    );
     const [loadingPreset, setLoadingPreset] = useState(null); // "beginners" | "open" | null
     const [error, setError] = useState("");
 
-    const { rounds } = useMemo(
-        () => buildRounds(players, winnersMap),
-        [players, winnersMap]
-    );
+    useEffect(() => {
+        if (typeof window === "undefined") return;
+
+        const payload = {
+            namesText,
+            players,
+            winnersMap,
+            savedAt: Date.now(),
+        };
+
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(payload));
+    }, [namesText, players, winnersMap]);
+
+    const { rounds } = useMemo(() => buildRounds(players, winnersMap), [players, winnersMap]);
 
     function regenerate() {
         const parsed = parseNames(namesText);
@@ -173,7 +201,10 @@ export default function BattleBracketPairsAndTriple() {
     }
 
     async function loadPreset(type) {
-        const url = type === "beginners" ? "https://script.google.com/macros/s/AKfycbyX2E8Hs_UA4NAqCggpRQgzrBfbZH0YAxtedo8Cr8dmqRpDz8ZMkdsnDud0Z-mAfwuE/exec?nomination=beginners" : "https://script.google.com/macros/s/AKfycbyX2E8Hs_UA4NAqCggpRQgzrBfbZH0YAxtedo8Cr8dmqRpDz8ZMkdsnDud0Z-mAfwuE/exec?nomination=open";
+        const url =
+            type === "beginners"
+                ? "https://script.google.com/macros/s/AKfycbyX2E8Hs_UA4NAqCggpRQgzrBfbZH0YAxtedo8Cr8dmqRpDz8ZMkdsnDud0Z-mAfwuE/exec?nomination=beginners"
+                : "https://script.google.com/macros/s/AKfycbyX2E8Hs_UA4NAqCggpRQgzrBfbZH0YAxtedo8Cr8dmqRpDz8ZMkdsnDud0Z-mAfwuE/exec?nomination=open";
 
         setError("");
         setLoadingPreset(type);
@@ -186,7 +217,7 @@ export default function BattleBracketPairsAndTriple() {
             const names = Array.isArray(data) ? data : data?.participants;
 
             if (!Array.isArray(names)) {
-                throw new Error("Bad response format: expected array or { names: [] }");
+                throw new Error("Bad response format: expected array or { participants: [] }");
             }
 
             const cleaned = names.map((x) => String(x).trim()).filter(Boolean);
@@ -200,6 +231,16 @@ export default function BattleBracketPairsAndTriple() {
         } finally {
             setLoadingPreset(null);
         }
+    }
+
+    function clearSaved() {
+        if (typeof window === "undefined") return;
+        localStorage.removeItem(STORAGE_KEY);
+        setNamesText("");
+        setPlayers([]);
+        setWinnersMap({});
+        setError("");
+        setLoadingPreset(null);
     }
 
     return (
@@ -252,13 +293,21 @@ export default function BattleBracketPairsAndTriple() {
                                     Сбросить результаты
                                 </button>
 
+                                <button
+                                    type="button"
+                                    onClick={clearSaved}
+                                    className="rounded-xl bg-transparent px-4 py-3 text-sm font-medium border border-black/25 text-black/80 hover:bg-white/50"
+                                    title="Удалит сохранённую сетку из localStorage"
+                                >
+                                    Очистить
+                                </button>
+
                                 {error ? (
                                     <div className="text-xs text-red-600 border border-red-600/20 bg-red-500/5 rounded-xl px-3 py-2">
                                         {error}
                                     </div>
                                 ) : null}
 
-                                {/* маленький список участников для удаления (до генерации/после) */}
                                 {players.length ? (
                                     <div className="rounded-xl border border-black/10 bg-white/40 p-3">
                                         <div className="text-xs font-semibold text-black/70 mb-2">
@@ -317,11 +366,7 @@ export default function BattleBracketPairsAndTriple() {
                                                                         if (!allReady) return;
                                                                         pickWinner(rIndex, mIndex, p);
                                                                     }}
-                                                                    onDelete={
-                                                                        p
-                                                                            ? () => deleteParticipant(p)
-                                                                            : undefined
-                                                                    }
+                                                                    onDelete={p ? () => deleteParticipant(p) : undefined}
                                                                 />
                                                             ))}
                                                         </div>
