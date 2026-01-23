@@ -1,5 +1,4 @@
 import Header from "../components/Header.jsx";
-import VinylRecordCanvas from "../components/VinylRecordCanvas.jsx";
 import Background from "../components/Background.jsx";
 import VinylRecord from "../components/VinylRecord.jsx";
 
