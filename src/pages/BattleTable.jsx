@@ -161,6 +161,11 @@ export default function BattleBracketPairsAndTriple() {
         setPlayers(shuffle(parsed));
         setWinnersMap({});
     }
+    function regenerateWithoutShuffle() {
+        const parsed = parseNames(namesText);
+        setPlayers(parsed);
+        setWinnersMap({});
+    }
 
     function resetAll() {
         setWinnersMap({});
@@ -283,6 +288,13 @@ export default function BattleBracketPairsAndTriple() {
                                     className="rounded-xl bg-black px-4 py-3 text-sm font-medium text-[#f5f2ec] hover:bg-black/90 border border-black/70"
                                 >
                                     Сгенерировать (рандом)
+                                </button>
+                                <button
+                                    type="button"
+                                    onClick={regenerateWithoutShuffle}
+                                    className="rounded-xl bg-black px-4 py-3 text-sm font-medium text-[#f5f2ec] hover:bg-black/90 border border-black/70"
+                                >
+                                    Сгенерировать
                                 </button>
 
                                 <button

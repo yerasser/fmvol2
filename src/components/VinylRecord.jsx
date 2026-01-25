@@ -22,6 +22,18 @@ export default function VinylRecord() {
 
     const canvasRef = useRef(null);
     const rafRef = useRef(null);
+    const logoRef = useRef(null);
+    const logoReadyRef = useRef(false);
+
+    useEffect(() => {
+        const img = new Image();
+        img.src = "/fm_logo.png";
+        img.onload = () => {
+            logoRef.current = img;
+            logoReadyRef.current = true;
+        };
+    }, []);
+
 
     const [spinning, setSpinning] = useState(false);
     const [liveIdx, setLiveIdx] = useState(0);
